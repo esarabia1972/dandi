@@ -16,9 +16,7 @@ export default function useApiKeys() {
       const data = await res.json();
       setApiKeys(Array.isArray(data) ? data : data.apiKeys ?? []);
     } catch (err) {
-      /* eslint-disable no-console */
-      console.error('Error fetching API keys:', err);
-      /* eslint-enable no-console */
+      // console.error('Error fetching API keys:', err);
     } finally {
       setLoading(false);
     }
@@ -54,7 +52,7 @@ export default function useApiKeys() {
       const err = await res.json();
       return { ok: false, error: err.error || 'Failed to create key' };
     } catch (error) {
-      console.error('Error creating API key:', error);
+      // console.error('Error creating API key:', error);
       return { ok: false, error: 'Failed to create key' };
     }
   };
@@ -69,7 +67,7 @@ export default function useApiKeys() {
       const err = await res.json();
       return { ok: false, error: err.error || 'Failed to delete key' };
     } catch (error) {
-      console.error('Error deleting API key:', error);
+      // console.error('Error deleting API key:', error);
       return { ok: false, error: 'Failed to delete key' };
     }
   };
@@ -94,7 +92,7 @@ export default function useApiKeys() {
       const err = await res.json();
       return { ok: false, error: err.error || 'Failed to update key' };
     } catch (error) {
-      console.error('Error updating API key:', error);
+      // console.error('Error updating API key:', error);
       return { ok: false, error: 'Failed to update key' };
     }
   };

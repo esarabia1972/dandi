@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '../../../lib/supabase';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { summarizeReadme } from '../../lib/githubSummarizer';
 
 // POST /api/github-summarizer
@@ -9,75 +10,50 @@ import { summarizeReadme } from '../../lib/githubSummarizer';
 // GitHub-summary logic later).
 
 export async function POST(request) {
+  const supabase = createRouteHandlerClient({ cookies });
   try {
-    let body = {};
-    try {
-      body = await request.json();
-    } catch (_) {
-      // Ignore JSON parse errors (likely empty body)
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    // Try to find the key in body first, then in common header names
-    const key =
-      body.key ||
-      request.headers.get('key') ||
-      request.headers.get('api-key') ||
-      request.headers.get('x-api-key');
-
-    const rest = { ...body };
-
-    if (!key || typeof key !== 'string') {
-      return NextResponse.json(
-        { error: 'API key is required' },
-        { status: 400 }
-      );
+    const apiKey = request.headers.get('x-api-key');
+    if (!apiKey) {
+      return NextResponse.json({ error: 'API key is required' }, { status: 400 });
     }
 
-    const { data, error } = await supabase
+    // Validate the API key against the current user
+    const { data: keyData, error: keyError } = await supabase
       .from('api_keys')
       .select('id')
-      .eq('key', key)
+      .eq('key', apiKey)
+      .eq('user_id', session.user.id)
       .single();
 
-    if (error && error.code !== 'PGRST116') {
-      throw error;
+    if (keyError || !keyData) {
+      return NextResponse.json({ error: 'Invalid or unauthorized API key' }, { status: 403 });
     }
 
-    const valid = !!data;
+    const body = await request.json();
+    const { repoUrl } = body;
 
-    if (!valid) {
-      return NextResponse.json(
-        { error: 'Invalid API key' },
-        { status: 401 }
-      );
-    }
-
-    if (!rest.githubURL || typeof rest.githubURL !== 'string') {
-      return NextResponse.json(
-        { error: 'Missing "githubURL" field with the repository URL.' },
-        { status: 400 }
-      );
+    if (!repoUrl || typeof repoUrl !== 'string') {
+      return NextResponse.json({ error: 'Missing "repoUrl" field.' }, { status: 400 });
     }
 
     try {
-      const readme = await getReadmeContent(rest.githubURL);
+      // The key has been validated; now we call the summarizer which uses the env key
+      const readme = await getReadmeContent(repoUrl);
       const summaryObj = await summarizeReadme(readme);
 
       return NextResponse.json({
-        success: true,
-        ...summaryObj,
+        summary: summaryObj,
       });
     } catch (summaryErr) {
-      return NextResponse.json(
-        { error: summaryErr.message },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: summaryErr.message }, { status: 500 });
     }
   } catch (err) {
-    return NextResponse.json(
-      { error: err.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
 
@@ -95,10 +71,8 @@ async function getReadmeContent(input) {
       [owner, repo] = parts;
     }
     
-    // Remove .git suffix if present
     const cleanRepo = repo.replace(/\.git$/, '');
     
-    // Fetch README content from GitHub API
     const response = await fetch(
       `https://api.github.com/repos/${owner}/${cleanRepo}/readme`,
       {
