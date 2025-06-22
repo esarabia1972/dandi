@@ -7,6 +7,16 @@ import { useUser } from '@supabase/auth-helpers-react';
 import { useState, useEffect } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
+const handleGoogleSignIn = async () => {
+  const supabase = supabaseBrowser();
+  await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+    },
+  });
+};
+
 export default function HomeContent() {
   const { user, isLoading } = useUser() || {};
   const searchParams = useSearchParams();
@@ -65,13 +75,7 @@ export default function HomeContent() {
 
           {/* Google Login */}
           <button
-            onClick={async () => {
-              const supabase = supabaseBrowser();
-              await supabase.auth.signInWithOAuth({
-                provider: 'google',
-                options: { queryParams: { access_type: 'offline', prompt: 'consent' } },
-              });
-            }}
+            onClick={handleGoogleSignIn}
             className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-red-600 text-white gap-2 hover:bg-red-700 font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
           >
             <svg className="w-5 h-5" viewBox="0 0 533.5 544.3" aria-hidden>
